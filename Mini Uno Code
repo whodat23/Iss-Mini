@@ -1,0 +1,39 @@
+// Previous code...
+
+if (test2.substring(0, delimeter) == "MimiSetAllServos")
+{
+  MimiSetAllServos_Flag = 1;
+  MiniAllServoVals = (test2.substring(delimeter + 1)).toFloat();
+  Serial.println("--- Setting all Mimi Servos to zero ---");
+}
+
+else if (test2.substring(0, delimeter) == "Mini_MidPosServos")
+{
+  Mini_MidPosServos_Flag = 1;
+  // MiniAllServoVals= (test2.substring(delimeter + 1)).toFloat();
+  Serial.println("--- Setting all Servos to center of travel ---");
+}
+
+else if (test2.substring(0, delimeter) == "Mini_MinPosServos")
+{
+  Mini_MinPosServos_Flag = 1;
+  // MiniAllServoVals= (test2.substring(delimeter + 1)).toFloat();
+  Serial.println("--- Setting all Servos to minimum position ---");
+}
+
+// Add more else if blocks as needed...
+
+else if (test2.substring(0, delimeter) == "AOS")
+{
+  //Serial.println(test2);
+  AOS = (test2.substring(delimeter + 1)).toFloat();
+  //Serial.println(AOS);
+  if (AOS == 1.00)
+  {
+    //digitalWrite(ledGreenPin, HIGH);
+  }
+  else
+  {
+    //digitalWrite(ledRedPin, HIGH);
+  }
+}
