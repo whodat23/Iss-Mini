@@ -1,0 +1,551 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////MINIMIMIC////////////////
+
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
+
+// called this way, it uses the default address 0x40
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+// you can also call it with a different address you want
+//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
+// you can also call it with a different address and I2C interface
+//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40, Wire);
+
+
+// Depending on your servo make, the pulse width min and max may vary, you
+// want these to be as small/large as possible without hitting the hard stop
+// for max range. You'll have to tweak them as necessary to match the servos you
+// have!
+#define SERVOMIN  90//82 // This is the 'minimum' pulse length count (out of 4096)
+#define SERVOMAX  500//482 // This is the 'maximum' pulse length count (out of 4096)
+//#define USMIN  600 // This is the rounded 'minimum' microsecond length based on the minimum pulse of 150
+//#define USMAX  2400 // This is the rounded 'maximum' microsecond length based on the maximum pulse of 600
+#define SERVO_FREQ 50 // Analog servos run at ~50 Hz updates
+
+// our servo # counter
+uint8_t servonum = 0;
+
+
+//int D0 = 0;
+//int D1 = 0;
+//int D2 = 0;
+int MimiSetAllServos_Flag=0;
+
+void setup() {
+
+  Serial.begin(9600);
+  Serial.setTimeout(50);
+
+  Serial.println("8 channel Servo test!");
+
+  pwm.begin();
+  /*
+     In theory the internal oscillator (clock) is 25MHz but it really isn't
+     that precise. You can 'calibrate' this by tweaking this number until
+     you get the PWM update frequency you're expecting!
+     The int.osc. for the PCA9685 chip is a range between about 23-27MHz and
+     is used for calculating things like writeMicroseconds()
+     Analog servos run at ~50 Hz updates, It is importaint to use an
+     oscilloscope in setting the int.osc frequency for the I2C PCA9685 chip.
+     1) Attach the oscilloscope to one of the PWM signal pins and ground on
+        the I2C PCA9685 chip you are setting the value for.
+     2) Adjust setOscillatorFrequency() until the PWM update frequency is the
+        expected value (50Hz for most ESCs)
+     Setting the value here is specific to each individual I2C PCA9685 chip and
+     affects the calculations for the PWM update frequency.
+     Failure to correctly set the int.osc value will cause unexpected PWM results
+  */
+  pwm.setOscillatorFrequency(27000000);
+  pwm.setPWMFreq(SERVO_FREQ);  // Analog servos run at ~50 Hz updates
+
+  delay(10);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//A_VAR_DECLARATIONS/////////
+// ===== Initializations ==========
+
+double B1A = 330.0;
+double B3A = 330.0;
+double B1B = 330.0;
+double B3B = 330.0;
+
+double B2B = 330.0;
+double B4B = 330.0; 
+double B2A = 330.0;
+double B4A = 330.0;
+
+double PSARJ = 30.0;
+double SSARJ = 0.0;
+double PTRRJ = -10.0; // TRRJ's expect +/- 180 deg commands (limited to +/- 135-ish on ISS).  Requires custom scaling later.
+double STRRJ = 0.0;
+boolean AOS = false;
+
+int MiniAllServoVals=0;
+
+int Mini_MinPosServos_Flag =0;
+int Mini_MidPosServos_Flag =0; // This is used to center all 12 servos.  Helpful for initial setup.  Put this command into the Serial Monitor (no "'s, and no _Flag): Mini_MidPosServos=1
+int Mini_MaxPosServos_Flag =0;
+
+int servonum_B1A = (0);
+int servonum_B3A = (1);
+int servonum_B1B = (2);
+int servonum_B3B = (3);
+
+int servonum_B2B = (4);
+int servonum_B4B = (5);
+int servonum_B2A = (6);
+int servonum_B4A = (7);
+
+int servonum_PSARJ = (8);
+int servonum_SSARJ = (9);
+int servonum_PTRRJ = (10);
+int servonum_STRRJ = (11);
+
+
+
+
+int pulselen_B1A = 0;
+int pulselen_B3A = 0;
+int pulselen_B1B = 0;
+int pulselen_B3B = 0;
+
+int pulselen_B2B = 0;
+int pulselen_B4B = 0;
+int pulselen_B2A = 0;
+int pulselen_B4A = 0;
+
+int pulselen_PSARJ = 0;
+int pulselen_SSARJ = 0;
+int pulselen_PTRRJ = 0;
+int pulselen_STRRJ = 0;
+
+
+
+void loop() {
+
+ if (Serial.available() > 0) {
+    // Read the incoming byte
+    char incomingByte = Serial.read();
+    
+    // Process the received data as needed
+    // For example, you can print it to the Serial Monitor
+
+ delay(1);
+
+  if (MimiSetAllServos_Flag == 1)
+  {
+    MimiSetAllServos_Flag = 0;
+    B1A = MiniAllServoVals;
+    B3A = MiniAllServoVals;
+    B1B = MiniAllServoVals;
+    B3B = MiniAllServoVals;
+
+    B2B = MiniAllServoVals;
+    B4B = MiniAllServoVals;
+    B2A = MiniAllServoVals;
+    B4A = MiniAllServoVals;
+
+    PSARJ = MiniAllServoVals;
+    SSARJ = MiniAllServoVals;
+    
+    // biasing TRRJ commands, since they use +/- 180 deg commands, unlike BGAs & SARJ which use 0-360 deg commands.
+    PTRRJ = MiniAllServoVals-180; 
+    STRRJ = MiniAllServoVals-180;
+  }
+
+  if (Mini_MidPosServos_Flag == 1)
+  {
+    Mini_MidPosServos_Flag = 0;
+    B1A = 180;
+    B3A = 180;
+    B1B = 180;
+    B3B = 180;
+
+    B2B = 180;
+    B4B = 180;
+    B2A = 180;
+    B4A = 180;
+
+    PSARJ = 180;
+    SSARJ = 180;
+    
+    // TRRJ cmds use +/- 105 deg commands, unlike BGAs & SARJ which use 0-360 deg commands.
+    PTRRJ = 90; 
+    STRRJ = 90;
+  }
+
+    if (Mini_MaxPosServos_Flag == 1)
+  {
+    Mini_MaxPosServos_Flag = 0;
+    B1A = 360;
+    B3A = 360;
+    B1B = 360;
+    B3B = 360;
+
+    B2B = 360;
+    B4B = 360;
+    B2A = 360;
+    B4A = 360;
+
+    PSARJ = 360;
+    SSARJ = 360;
+    
+    // TRRJ cmds use +/- 105 deg commands, unlike BGAs & SARJ which use 0-360 deg commands.
+    PTRRJ = 180; 
+    STRRJ = 180;
+  }
+
+   if (Mini_MinPosServos_Flag == 1)
+  {
+    Mini_MinPosServos_Flag = 0;
+    B1A = 0;
+    B3A = 0;
+    B1B = 0;
+    B3B = 0;
+
+    B2B = 0;
+    B4B = 0;
+    B2A = 0;
+    B4A = 0;
+
+    PSARJ = 0;
+    SSARJ = 0;
+    
+    // TRRJ cmds use +/- 105 deg commands, unlike BGAs & SARJ which use 0-360 deg commands.
+    PTRRJ = 0; 
+    STRRJ = 0;
+  }
+
+  // servonum_B2B = 1;
+
+  pulselen_B1A = map(B1A, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B3A = map(B3A, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B1B = map(B1B, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B3B = map(B3B, 0, 360, SERVOMIN, SERVOMAX);
+
+  pulselen_B2B = map(B2B, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B4B = map(B4B, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B2A = map(B2A, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B4A = map(B4A, 0, 360, SERVOMIN, SERVOMAX);
+
+  pulselen_PSARJ = map(PSARJ, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_SSARJ = map(SSARJ, 0, 360, SERVOMIN, SERVOMAX);
+  
+  // TRRJ commands are +/- 180 degrees (from ISS), so scaling differently than BGAs and SARJs, which are 0-360 deg.
+  pulselen_PTRRJ = map(PTRRJ, 0, 360, SERVOMIN, SERVOMAX); 
+  pulselen_STRRJ = map(STRRJ, 0, 360,  SERVOMIN, SERVOMAX);
+
+
+  pwm.setPWM(servonum_B1A, 0, pulselen_B1A);
+  pwm.setPWM(servonum_B3A, 0, pulselen_B3A);
+  pwm.setPWM(servonum_B1B, 0, pulselen_B1B);
+  pwm.setPWM(servonum_B3B, 0, pulselen_B3B);
+
+  pwm.setPWM(servonum_B2B, 0, pulselen_B2B);
+  pwm.setPWM(servonum_B4B, 0, pulselen_B4B);
+  pwm.setPWM(servonum_B2A, 0, pulselen_B2A);
+  pwm.setPWM(servonum_B4A, 0, pulselen_B4A);
+
+  pwm.setPWM(servonum_PSARJ, 0, pulselen_PSARJ);
+  pwm.setPWM(servonum_SSARJ, 0, pulselen_SSARJ);
+  pwm.setPWM(servonum_PTRRJ, 0, pulselen_PTRRJ);
+  pwm.setPWM(servonum_STRRJ, 0, pulselen_STRRJ);
+
+
+
+  Serial.print("B1A: ");  Serial.print(B1A); Serial.print(" | "); Serial.println( pulselen_B1A); 
+  Serial.print("B3A: ");  Serial.print(B3A); Serial.print(" | "); Serial.println( pulselen_B3A);
+  Serial.print("B1B: ");  Serial.print(B1B); Serial.print(" | "); Serial.println( pulselen_B1B);
+  Serial.print("B3B: ");  Serial.print(B3B); Serial.print(" | "); Serial.println( pulselen_B3B);
+
+  Serial.print("B2B: ");  Serial.print(B2B); Serial.print(" | "); Serial.println( pulselen_B2B);
+  Serial.print("B4B: ");  Serial.print(B4B); Serial.print(" | "); Serial.println( pulselen_B4B);
+  Serial.print("B2A: ");  Serial.print(B2A); Serial.print(" | "); Serial.println( pulselen_B2A);
+  Serial.print("B4A: ");  Serial.print(B4A); Serial.print(" | "); Serial.println( pulselen_B4A);
+
+  Serial.print("PSARJ: ");  Serial.print(PSARJ); Serial.print(" | "); Serial.println( pulselen_PSARJ);
+  Serial.print("SSARJ: ");  Serial.print(SSARJ); Serial.print(" | "); Serial.println( pulselen_SSARJ);
+  Serial.print("PTRRJ: ");  Serial.print(PTRRJ); Serial.print(" | "); Serial.println( pulselen_PTRRJ);
+  Serial.print("STRRJ: ");  Serial.print(STRRJ); Serial.print(" | "); Serial.println( pulselen_STRRJ);
+
+
+  //  pwm.setPWM(servonum, 0, pulselen);
+
+  delay(500);
+
+  //  // ============== Time measures ===================================================
+  //  LoopStartMillis = millis();
+  //  delta_t_millis = max(LoopStartMillis - previousMillis, 1); // ensure always equal to at least one, for later inversion
+  //  inverse_delta_t_millis = 1 / ((float) delta_t_millis); // BCM mod 10/28/2018: for some reason, was not inverted (just = value, rather than 1/value).
+  //  millisChPt1 = millis() - LoopStartMillis;
+  //  // ================================================================================
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////BMAINLOOP////////////////////////
+
+
+
+  delay(1);
+  if (Serial.available() > 0) {
+    // Read the incoming byte
+    char incomingByte = Serial.read();
+    
+    // Process the received data as needed
+    // For example, you can print it to the Serial Monitor
+
+  if (MimiSetAllServos_Flag == 1)
+  {
+    MimiSetAllServos_Flag = 0;
+    B1A = MiniAllServoVals;
+    B3A = MiniAllServoVals;
+    B1B = MiniAllServoVals;
+    B3B = MiniAllServoVals;
+
+    B2B = MiniAllServoVals;
+    B4B = MiniAllServoVals;
+    B2A = MiniAllServoVals;
+    B4A = MiniAllServoVals;
+
+    PSARJ = MiniAllServoVals;
+    SSARJ = MiniAllServoVals;
+    
+    // biasing TRRJ commands, since they use +/- 180 deg commands, unlike BGAs & SARJ which use 0-360 deg commands.
+    PTRRJ = MiniAllServoVals-180; 
+    STRRJ = MiniAllServoVals-180;
+  }
+
+  if (Mini_MidPosServos_Flag == 1)
+  {
+    Mini_MidPosServos_Flag = 0;
+    B1A = 180;
+    B3A = 180;
+    B1B = 180;
+    B3B = 180;
+
+    B2B = 180;
+    B4B = 180;
+    B2A = 180;
+    B4A = 180;
+
+    PSARJ = 180;
+    SSARJ = 180;
+    
+    // TRRJ cmds use +/- 105 deg commands, unlike BGAs & SARJ which use 0-360 deg commands.
+    PTRRJ = 90; 
+    STRRJ = 90;
+  }
+
+    if (Mini_MaxPosServos_Flag == 1)
+  {
+    Mini_MaxPosServos_Flag = 0;
+    B1A = 360;
+    B3A = 360;
+    B1B = 360;
+    B3B = 360;
+
+    B2B = 360;
+    B4B = 360;
+    B2A = 360;
+    B4A = 360;
+
+    PSARJ = 360;
+    SSARJ = 360;
+    
+    // TRRJ cmds use +/- 105 deg commands, unlike BGAs & SARJ which use 0-360 deg commands.
+    PTRRJ = 180; 
+    STRRJ = 180;
+  }
+
+   if (Mini_MinPosServos_Flag == 1)
+  {
+    Mini_MinPosServos_Flag = 0;
+    B1A = 0;
+    B3A = 0;
+    B1B = 0;
+    B3B = 0;
+
+    B2B = 0;
+    B4B = 0;
+    B2A = 0;
+    B4A = 0;
+
+    PSARJ = 0;
+    SSARJ = 0;
+    
+    // TRRJ cmds use +/- 105 deg commands, unlike BGAs & SARJ which use 0-360 deg commands.
+    PTRRJ = 0; 
+    STRRJ = 0;
+  }
+
+  // servonum_B2B = 1;
+
+  pulselen_B1A = map(B1A, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B3A = map(B3A, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B1B = map(B1B, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B3B = map(B3B, 0, 360, SERVOMIN, SERVOMAX);
+
+  pulselen_B2B = map(B2B, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B4B = map(B4B, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B2A = map(B2A, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_B4A = map(B4A, 0, 360, SERVOMIN, SERVOMAX);
+
+  pulselen_PSARJ = map(PSARJ, 0, 360, SERVOMIN, SERVOMAX);
+  pulselen_SSARJ = map(SSARJ, 0, 360, SERVOMIN, SERVOMAX);
+  
+  // TRRJ commands are +/- 180 degrees (from ISS), so scaling differently than BGAs and SARJs, which are 0-360 deg.
+  pulselen_PTRRJ = map(PTRRJ, 0, 360, SERVOMIN, SERVOMAX); 
+  pulselen_STRRJ = map(STRRJ, 0, 360,  SERVOMIN, SERVOMAX);
+
+
+  pwm.setPWM(servonum_B1A, 0, pulselen_B1A);
+  pwm.setPWM(servonum_B3A, 0, pulselen_B3A);
+  pwm.setPWM(servonum_B1B, 0, pulselen_B1B);
+  pwm.setPWM(servonum_B3B, 0, pulselen_B3B);
+
+  pwm.setPWM(servonum_B2B, 0, pulselen_B2B);
+  pwm.setPWM(servonum_B4B, 0, pulselen_B4B);
+  pwm.setPWM(servonum_B2A, 0, pulselen_B2A);
+  pwm.setPWM(servonum_B4A, 0, pulselen_B4A);
+
+  pwm.setPWM(servonum_PSARJ, 0, pulselen_PSARJ);
+  pwm.setPWM(servonum_SSARJ, 0, pulselen_SSARJ);
+  pwm.setPWM(servonum_PTRRJ, 0, pulselen_PTRRJ);
+  pwm.setPWM(servonum_STRRJ, 0, pulselen_STRRJ);
+
+
+
+  Serial.print("B1A: ");  Serial.print(B1A); Serial.print(" | "); Serial.println( pulselen_B1A); 
+  Serial.print("B3A: ");  Serial.print(B3A); Serial.print(" | "); Serial.println( pulselen_B3A);
+  Serial.print("B1B: ");  Serial.print(B1B); Serial.print(" | "); Serial.println( pulselen_B1B);
+  Serial.print("B3B: ");  Serial.print(B3B); Serial.print(" | "); Serial.println( pulselen_B3B);
+
+  Serial.print("B2B: ");  Serial.print(B2B); Serial.print(" | "); Serial.println( pulselen_B2B);
+  Serial.print("B4B: ");  Serial.print(B4B); Serial.print(" | "); Serial.println( pulselen_B4B);
+  Serial.print("B2A: ");  Serial.print(B2A); Serial.print(" | "); Serial.println( pulselen_B2A);
+  Serial.print("B4A: ");  Serial.print(B4A); Serial.print(" | "); Serial.println( pulselen_B4A);
+
+  Serial.print("PSARJ: ");  Serial.print(PSARJ); Serial.print(" | "); Serial.println( pulselen_PSARJ);
+  Serial.print("SSARJ: ");  Serial.print(SSARJ); Serial.print(" | "); Serial.println( pulselen_SSARJ);
+  Serial.print("PTRRJ: ");  Serial.print(PTRRJ); Serial.print(" | "); Serial.println( pulselen_PTRRJ);
+  Serial.print("STRRJ: ");  Serial.print(STRRJ); Serial.print(" | "); Serial.println( pulselen_STRRJ);
+
+
+  //  pwm.setPWM(servonum, 0, pulselen);
+
+  delay(500);
+
+  //  // ============== Time measures ===================================================
+  //  LoopStartMillis = millis();
+  //  delta_t_millis = max(LoopStartMillis - previousMillis, 1); // ensure always equal to at least one, for later inversion
+  //  inverse_delta_t_millis = 1 / ((float) delta_t_millis); // BCM mod 10/28/2018: for some reason, was not inverted (just = value, rather than 1/value).
+  //  millisChPt1 = millis() - LoopStartMillis;
+  //  // ================================================================================
+
+}}}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////ZINTERRUPTEVENTS/////////////////////////////////////////////////////////////////////////
+
+
+// Read seriald data from the RasPi, telling the motors and LEDs what to do.
+void checkSerial()
+ {
+  //digitalWrite(ledBluePin, HIGH);
+  String test = "";
+
+  while (Serial.available() > 0) 
+  {
+    test = Serial.readString();
+  
+// Serial1.println(test);
+char sz[test.length() + 1];
+char copy[test.length() + 1];
+strcpy(sz, test.c_str());
+char *p = sz;
+String str; // Define str as a String
+int delimeter = 0;
+String test2 = "";
+
+while ((str = strtok_r(p, " ", &p)) != NULL)
+{
+  {
+    test2 = String(str);
+    delimeter = test2.indexOf('=');
+    if (test2.substring(0, delimeter) == "PSARJ")
+    {
+      PSARJ = (test2.substring(delimeter + 1)).toFloat();
+    }
+    //    else if (test2.substring(0, delimeter) == "SmartRolloverBGA")
+    //    {
+    //      SmartRolloverBGA = int((test2.substring(delimeter + 1)).toFloat());
+    //    }
+    //    else if (test2.substring(0, delimeter) == "SmartRolloverSARJ")
+    //    {
+    //      SmartRolloverSARJ = int((test2.substring(delimeter + 1)).toFloat());
+    //    }
+    //    else if (test2.substring(0, delimeter) == "NULLIFY")
+    //    {
+    //      NULLIFY = int((test2.substring(delimeter + 1)).toFloat());
+    //    }
+    //    else if (test2.substring(0, delimeter) == "Kp_PSARJ")
+    //    {
+    //      Kp_PSARJ = (test2.substring(delimeter + 1)).toFloat();
+    //    }
+    //    else if (test2.substring(0, delimeter) == "Ki_PSARJ")
+    //    {
+    //      Ki_PSARJ = (test2.substring(delimeter + 1)).toFloat();
+    //    }
+    //    else if (test2.substring(0, delimeter) == "Kd_PSARJ")
+    //    {
+    //      Kd_PSARJ = (test2.substring(delimeter + 1)).toFloat();
+    //    }
+  }
+   // Previous code...
+
+if (test2.substring(0, delimeter) == "MimiSetAllServos")
+{
+  MimiSetAllServos_Flag = 1;
+  MiniAllServoVals = (test2.substring(delimeter + 1)).toFloat();
+  Serial.println("--- Setting all Mimi Servos to zero ---");
+}
+
+else if (test2.substring(0, delimeter) == "Mini_MidPosServos")
+{
+  Mini_MidPosServos_Flag = 1;
+  // MiniAllServoVals= (test2.substring(delimeter + 1)).toFloat();
+  Serial.println("--- Setting all Servos to center of travel ---");
+}
+
+else if (test2.substring(0, delimeter) == "Mini_MinPosServos")
+{
+  Mini_MinPosServos_Flag = 1;
+  // MiniAllServoVals= (test2.substring(delimeter + 1)).toFloat();
+  Serial.println("--- Setting all Servos to minimum position ---");
+}
+
+// Add more else if blocks as needed...
+
+else if (test2.substring(0, delimeter) == "AOS")
+{
+  //Serial.println(test2);
+  AOS = (test2.substring(delimeter + 1)).toFloat();
+  //Serial.println(AOS);
+  if (AOS == 1.00)
+  {
+    //digitalWrite(ledGreenPin, HIGH);
+  }
+  else
+  {
+    //digitalWrite(ledRedPin, HIGH);
+  }
+}}}}
